@@ -1,14 +1,10 @@
 """Small C ABI for batched quadrature reductions over float64 buffers."""
 
-from std.algorithm.functional import parallelize
 from std.sys.info import simd_width_of
 
 
 comptime W = simd_width_of[DType.float64]()
-comptime PARALLEL_MIN_ELEMENTS = 4_000_000
-comptime PARALLEL_MIN_ROWS = 128
-comptime PARALLEL_WORKERS = 8
-comptime Ptr = UnsafePointer[Float64, AnyOrigin[mut=True]]
+comptime Ptr = Pointer[Float64, AnyOrigin[mut=True]]
 
 
 def weighted_sum_row(values: Ptr, weights: Ptr, dst: Ptr, n: Int, row: Int):
@@ -19,30 +15,24 @@ def weighted_sum_row(values: Ptr, weights: Ptr, dst: Ptr, n: Int, row: Int):
     var i = 0
     var base = row * n
     while i + 4 * W <= n:
-        acc0 += values.load[width=W](base + i) * weights.load[width=W](i)
-        acc1 += values.load[width=W](base + i + W) * weights.load[width=W](i + W)
-        acc2 += values.load[width=W](base + i + 2 * W) * weights.load[width=W](i + 2 * W)
-        acc3 += values.load[width=W](base + i + 3 * W) * weights.load[width=W](i + 3 * W)
+        acc0 += values.unsafe_load[width=W](base + i) * weights.unsafe_load[width=W](i)
+        acc1 += values.unsafe_load[width=W](base + i + W) * weights.unsafe_load[width=W](i + W)
+        acc2 += values.unsafe_load[width=W](base + i + 2 * W) * weights.unsafe_load[width=W](i + 2 * W)
+        acc3 += values.unsafe_load[width=W](base + i + 3 * W) * weights.unsafe_load[width=W](i + 3 * W)
         i += 4 * W
     while i + W <= n:
-        acc0 += values.load[width=W](base + i) * weights.load[width=W](i)
+        acc0 += values.unsafe_load[width=W](base + i) * weights.unsafe_load[width=W](i)
         i += W
     var total = (acc0 + acc1 + acc2 + acc3).reduce_add()
     while i < n:
-        total += values[base + i] * weights[i]
+        total += values[unsafe_offset=base + i] * weights[unsafe_offset=i]
         i += 1
-    dst[row] = total
+    dst[unsafe_offset=row] = total
 
 
 def weighted_sum(values: Ptr, weights: Ptr, dst: Ptr, n: Int, rows: Int):
-    if rows >= PARALLEL_MIN_ROWS and n * rows >= PARALLEL_MIN_ELEMENTS:
-        @parameter
-        def compute_row(row: Int):
-            weighted_sum_row(values, weights, dst, n, row)
-        parallelize[compute_row](rows, PARALLEL_WORKERS)
-    else:
-        for row in range(rows):
-            weighted_sum_row(values, weights, dst, n, row)
+    for row in range(rows):
+        weighted_sum_row(values, weights, dst, n, row)
 
 
 @export("mq_weighted_sum")
