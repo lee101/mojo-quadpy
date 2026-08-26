@@ -13,7 +13,6 @@ def _reduce(values, weights):
     values = np.asarray(values)
     if values.dtype.kind != "f" or values.dtype.itemsize > np.dtype(np.float64).itemsize:
         raise TypeError("integrand values must have a real floating-point dtype no wider than float64")
-    values = np.ascontiguousarray(values, dtype=np.float64)
     if values.ndim == 0:
         return values * weights.sum()
     if values.shape[-1] != weights.size:

@@ -100,7 +100,7 @@ def test_weighted_sum_rejects_lossy_or_ambiguous_ffi_inputs():
     assert empty.shape == (0,)
 
 
-@pytest.mark.parametrize("rows,n", [(31, 65_539), (128, 32_771)])
+@pytest.mark.parametrize("rows,n", [(31, 65_539), (256, 32_771)])
 def test_weighted_sum_simd_tail_and_parallel_threshold(rows, n):
     rng = np.random.default_rng(rows + n)
     values = rng.normal(size=(rows, n))
